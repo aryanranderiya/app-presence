@@ -65,7 +65,7 @@ Then turn it on in Settings and add a line. The new icon path resolves immediate
 ## What WakaTime tracks
 
 - **Claude Code** comes from the `claude-code-wakatime` plugin, which reports files, languages and AI line counts.
-- **Conductor** agent sessions come from the `conductor-wakatime` LaunchAgent, which reads Conductor's local database.
+- **Conductor** agent sessions come from the `conductor-wakatime` LaunchAgent, which reads Conductor's local database. Backfill history with `conductor-wakatime backfill --days 30 --end-days 1`.
 - **Everything else** comes from the macOS WakaTime app. Keep its monitored apps limited to coding tools. Tracking Mail or Spotify tags them as AI coding and pollutes the numbers.
 
 ## Privacy
