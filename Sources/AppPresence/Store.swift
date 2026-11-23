@@ -107,8 +107,7 @@ final class Store {
         setPolicyLocked(policy, bundleID: bundleID, name: name)
     }
 
-    func blockedApps() -> [BlockedApp] {
-        lock.lock()
+    func blockedApps() -> [BlockedApp] {        lock.lock()
         defer { lock.unlock() }
         guard let db else { return [] }
         var statement: OpaquePointer?
@@ -124,8 +123,18 @@ final class Store {
         return out
     }
 
-    func phrase(for bundleID: String) -> String? {
+    func allowedCount() -> Int {
         lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return 0 }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM apps WHERE policy = 'show'", -1, &statement, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int(statement, 0))
+    }
+
+    func phrase(for bundleID: String) -> String? {        lock.lock()
         defer { lock.unlock() }
         return phraseLocked(bundleID)
     }

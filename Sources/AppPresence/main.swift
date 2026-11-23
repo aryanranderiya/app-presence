@@ -28,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monitor.start()
         syncWakaTime()
 
-        if CommandLine.arguments.contains("--settings") {
+        if CommandLine.arguments.contains("--settings") || store.allowedCount() == 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 self?.openSettings()
             }
@@ -42,9 +42,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func buildStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let icon = MenuBarIcon.make()
         item.button?.image = icon
+        item.button?.imageScaling = .scaleProportionallyDown
         item.button?.toolTip = "AppPresence"
 
         let menu = NSMenu()
