@@ -106,13 +106,18 @@ final class WakaTimeService {
             let systems = payload["operating_systems"] as? [[String: Any]] ?? []
 
             let project = projects.first?["name"] as? String
-            let language = languages
-                .first { ($0["name"] as? String)?.lowercased() != "other" }?["name"] as? String
+            let languageItem = languages.first { ($0["name"] as? String)?.lowercased() != "other" }
+            let language = languageItem?["name"] as? String
             let editor = editors.first?["name"] as? String
             let system = systems.first?["name"] as? String
 
-            let summary = [project, language, editor].compactMap { $0 }.joined(separator: " · ")
-            var hoverParts = ["\(projects.count) projects"]
+            let projectPart = project.map { "\($0) \(compact(projects.first?["total_seconds"] as? Double ?? 0))" }
+            let languagePart = language.map { "\($0) \(compact(languageItem?["total_seconds"] as? Double ?? 0))" }
+            let summary = [projectPart, languagePart].compactMap { $0 }.joined(separator: " · ")
+
+            var hoverParts: [String] = []
+            if let editor { hoverParts.append("\(editor) \(compact(editors.first?["total_seconds"] as? Double ?? 0))") }
+            hoverParts.append("\(projects.count) projects")
             if let system { hoverParts.append(system) }
             if aiLines > 0 { hoverParts.append("\(aiLines) AI lines") }
 
@@ -124,6 +129,14 @@ final class WakaTimeService {
             log("wakatime \(snapshot.total) \(summary)")
             DispatchQueue.main.async { completion(snapshot) }
         }.resume()
+    }
+
+    private static func compact(_ seconds: Double) -> String {
+        let total = max(Int(seconds), 0)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        if hours > 0 { return "\(hours)h \(minutes)m" }
+        return "\(minutes)m"
     }
 
     private static func apiKey() -> String? {
