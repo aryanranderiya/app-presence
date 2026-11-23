@@ -14,7 +14,7 @@ A tiny macOS menu bar app. No bot, no token, no login, and nothing uploaded to t
 - **Custom status lines.** Each app gets its own line, like `shipping with` for Rex or `conducting agents` for Conductor. The app name sits underneath, so there is no duplication. Seeded for 50+ apps, editable per app.
 - **Real logos, not placeholders.** Every app in `/Applications` is exported at 512px and served from this repo. Rex, Conductor, Arc, Ghostty and 263 others each show their actual icon.
 - **Elapsed time from launch.** Discord's timer counts from when the app actually opened, not from when you last focused it.
-- **A second card for WakaTime.** Your weekly leaderboard rank and today's coding total, then your daily average and 7-day total, with editor, project count, OS and AI lines on hover, plus Dashboard and Leaderboard buttons. It uses the Watching activity type, which is how it coexists with the Playing card.
+- **A second card for WakaTime.** Today's total and your weekly leaderboard rank, then your daily average and 7-day total in hours, with editor, project count, OS and AI lines on hover, plus Dashboard and Leaderboard buttons. It uses the Watching activity type, which is how it coexists with the Playing card.
 - **Hard blocks.** Mark an app as never, like Discord or 1Password, and it can never appear even if you enable everything else.
 - **Stays put.** Switching to a hidden app does not wipe your status. The last allowed card stays until another allowed app takes over.
 - **Menu bar only.** No dock icon, no window, no polling loop.
@@ -61,6 +61,12 @@ git add icons && git commit -m "icons" && git push
 ```
 
 Then turn it on in Settings and add a line. The new icon path resolves immediately because it has never been cached.
+
+## What WakaTime tracks
+
+- **Claude Code** comes from the `claude-code-wakatime` plugin, which reports files, languages and AI line counts.
+- **Conductor** agent sessions come from the `conductor-wakatime` LaunchAgent, which reads Conductor's local database.
+- **Everything else** comes from the macOS WakaTime app. Keep its monitored apps limited to coding tools. Tracking Mail or Spotify tags them as AI coding and pollutes the numbers.
 
 ## Privacy
 

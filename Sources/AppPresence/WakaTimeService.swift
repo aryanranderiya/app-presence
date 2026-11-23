@@ -57,7 +57,7 @@ final class WakaTimeService {
 
     private func push() {
         guard let snapshot else { return }
-        let details = snapshot.rank.map { "Rank #\($0) · \(snapshot.total)" } ?? snapshot.total
+        let details = snapshot.rank.map { "\(snapshot.total) • Rank #\($0)" } ?? snapshot.total
         let hover = snapshot.rank.map { "Rank #\($0) this week · \(snapshot.hover)" } ?? snapshot.hover
         rpc.setActivity(Presence(
             name: "WakaTime",
@@ -117,13 +117,13 @@ final class WakaTimeService {
             fetchLeaderboard(key: key) { board in
                 var summaryParts: [String] = []
                 if let board {
-                    if board.dailySeconds > 0 { summaryParts.append("\(compact(board.dailySeconds))/day avg") }
-                    if board.weekSeconds > 0 { summaryParts.append("\(compact(board.weekSeconds)) this week") }
+                    if board.dailySeconds > 0 { summaryParts.append("\(hoursOnly(board.dailySeconds))/day") }
+                    if board.weekSeconds > 0 { summaryParts.append("\(hoursOnly(board.weekSeconds))/week") }
                 }
 
                 let snapshot = WakaTimeSnapshot(
                     total: "\(hours)h \(minutes)m today",
-                    summary: summaryParts.joined(separator: " · "),
+                    summary: summaryParts.joined(separator: " • "),
                     hover: hoverParts.joined(separator: " · "),
                     rank: board?.rank
                 )
@@ -183,6 +183,11 @@ final class WakaTimeService {
             }
             completion(root)
         }.resume()
+    }
+
+    private static func hoursOnly(_ seconds: Double) -> String {
+        let hours = Int((max(seconds, 0) / 3600).rounded())
+        return "\(hours)h"
     }
 
     private static func compact(_ seconds: Double) -> String {
