@@ -4,6 +4,7 @@ struct WakaTimeSnapshot {
     let total: String
     let summary: String
     let hover: String
+    let rank: Int?
 }
 
 final class WakaTimeService {
@@ -56,12 +57,14 @@ final class WakaTimeService {
 
     private func push() {
         guard let snapshot else { return }
+        let details = snapshot.rank.map { "Rank #\($0) · \(snapshot.total)" } ?? snapshot.total
+        let hover = snapshot.rank.map { "Rank #\($0) this week · \(snapshot.hover)" } ?? snapshot.hover
         rpc.setActivity(Presence(
             name: "WakaTime",
-            details: snapshot.total,
+            details: details,
             state: snapshot.summary.isEmpty ? nil : snapshot.summary,
             iconURL: Self.iconURL,
-            iconText: snapshot.hover,
+            iconText: hover,
             buttons: [
                 PresenceButton(label: "Dashboard", url: "https://wakatime.com/dashboard"),
                 PresenceButton(label: "Leaderboard", url: "https://wakatime.com/leaders"),
@@ -83,8 +86,7 @@ final class WakaTimeService {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
-        let credentials = Data((key + ":").utf8).base64EncodedString()
-        request.setValue("Basic \(credentials)", forHTTPHeaderField: "Authorization")
+        request.setValue("Basic \(Data((key + ":").utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")
 
         URLSession.shared.dataTask(with: request) { data, _, error in
             guard let data, error == nil,
@@ -121,13 +123,37 @@ final class WakaTimeService {
             if let system { hoverParts.append(system) }
             if aiLines > 0 { hoverParts.append("\(aiLines) AI lines") }
 
-            let snapshot = WakaTimeSnapshot(
-                total: "\(hours)h \(minutes)m today",
-                summary: summary,
-                hover: hoverParts.joined(separator: " · ")
-            )
-            log("wakatime \(snapshot.total) \(summary)")
-            DispatchQueue.main.async { completion(snapshot) }
+            fetchRank(key: key) { rank in
+                let snapshot = WakaTimeSnapshot(
+                    total: "\(hours)h \(minutes)m today",
+                    summary: summary,
+                    hover: hoverParts.joined(separator: " · "),
+                    rank: rank
+                )
+                log("wakatime \(snapshot.total) rank=\(rank.map(String.init) ?? "-") \(summary)")
+                DispatchQueue.main.async { completion(snapshot) }
+            }
+        }.resume()
+    }
+
+    private static func fetchRank(key: String, completion: @escaping (Int?) -> Void) {
+        guard let url = URL(string: "https://wakatime.com/api/v1/leaders?page=1") else {
+            completion(nil)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        request.setValue("Basic \(Data((key + ":").utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")
+
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            guard let data,
+                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let current = root["current_user"] as? [String: Any],
+                  let rank = current["rank"] as? Int else {
+                completion(nil)
+                return
+            }
+            completion(rank)
         }.resume()
     }
 
