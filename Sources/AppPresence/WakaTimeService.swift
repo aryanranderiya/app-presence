@@ -103,41 +103,71 @@ final class WakaTimeService {
             let aiLines = total["ai_additions"] as? Int ?? 0
 
             let projects = payload["projects"] as? [[String: Any]] ?? []
-            let languages = payload["languages"] as? [[String: Any]] ?? []
             let editors = payload["editors"] as? [[String: Any]] ?? []
             let systems = payload["operating_systems"] as? [[String: Any]] ?? []
 
-            let project = projects.first?["name"] as? String
-            let languageItem = languages.first { ($0["name"] as? String)?.lowercased() != "other" }
-            let language = languageItem?["name"] as? String
-            let editor = editors.first?["name"] as? String
-            let system = systems.first?["name"] as? String
-
-            let projectPart = project.map { "\($0) \(compact(projects.first?["total_seconds"] as? Double ?? 0))" }
-            let languagePart = language.map { "\($0) \(compact(languageItem?["total_seconds"] as? Double ?? 0))" }
-            let summary = [projectPart, languagePart].compactMap { $0 }.joined(separator: " · ")
-
             var hoverParts: [String] = []
-            if let editor { hoverParts.append("\(editor) \(compact(editors.first?["total_seconds"] as? Double ?? 0))") }
+            if let editor = editors.first?["name"] as? String {
+                hoverParts.append("\(editor) \(compact(editors.first?["total_seconds"] as? Double ?? 0))")
+            }
             hoverParts.append("\(projects.count) projects")
-            if let system { hoverParts.append(system) }
+            if let system = systems.first?["name"] as? String { hoverParts.append(system) }
             if aiLines > 0 { hoverParts.append("\(aiLines) AI lines") }
 
-            fetchRank(key: key) { rank in
+            fetchLeaderboard(key: key) { board in
+                var summaryParts: [String] = []
+                if let board {
+                    if board.dailySeconds > 0 { summaryParts.append("\(compact(board.dailySeconds))/day avg") }
+                    if board.weekSeconds > 0 { summaryParts.append("\(compact(board.weekSeconds)) this week") }
+                }
+
                 let snapshot = WakaTimeSnapshot(
                     total: "\(hours)h \(minutes)m today",
-                    summary: summary,
+                    summary: summaryParts.joined(separator: " · "),
                     hover: hoverParts.joined(separator: " · "),
-                    rank: rank
+                    rank: board?.rank
                 )
-                log("wakatime \(snapshot.total) rank=\(rank.map(String.init) ?? "-") \(summary)")
+                log("wakatime \(snapshot.total) rank=\(board.map { String($0.rank) } ?? "-") \(snapshot.summary)")
                 DispatchQueue.main.async { completion(snapshot) }
             }
         }.resume()
     }
 
-    private static func fetchRank(key: String, completion: @escaping (Int?) -> Void) {
-        guard let url = URL(string: "https://wakatime.com/api/v1/leaders?page=1") else {
+    private struct Leaderboard {
+        let rank: Int
+        let weekSeconds: Double
+        let dailySeconds: Double
+    }
+
+    private static func fetchLeaderboard(key: String, completion: @escaping (Leaderboard?) -> Void) {
+        fetchPage(key, page: 1) { first in
+            guard let first,
+                  let current = first["current_user"] as? [String: Any],
+                  let rank = current["rank"] as? Int else {
+                completion(nil)
+                return
+            }
+            let page = current["page"] as? Int ?? 1
+
+            fetchPage(key, page: page) { target in
+                guard let target,
+                      let entries = target["data"] as? [[String: Any]],
+                      let entry = entries.first(where: { ($0["rank"] as? Int) == rank }),
+                      let running = entry["running_total"] as? [String: Any] else {
+                    completion(Leaderboard(rank: rank, weekSeconds: 0, dailySeconds: 0))
+                    return
+                }
+                completion(Leaderboard(
+                    rank: rank,
+                    weekSeconds: running["total_seconds"] as? Double ?? 0,
+                    dailySeconds: running["daily_average"] as? Double ?? 0
+                ))
+            }
+        }
+    }
+
+    private static func fetchPage(_ key: String, page: Int, completion: @escaping ([String: Any]?) -> Void) {
+        guard let url = URL(string: "https://wakatime.com/api/v1/leaders?page=\(page)") else {
             completion(nil)
             return
         }
@@ -147,13 +177,11 @@ final class WakaTimeService {
 
         URLSession.shared.dataTask(with: request) { data, _, _ in
             guard let data,
-                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let current = root["current_user"] as? [String: Any],
-                  let rank = current["rank"] as? Int else {
+                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 completion(nil)
                 return
             }
-            completion(rank)
+            completion(root)
         }.resume()
     }
 
