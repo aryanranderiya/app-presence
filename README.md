@@ -12,10 +12,11 @@ Live App Status
 
 - `NSWorkspace.didActivateApplicationNotification` fires the moment you switch apps.
 - The bundle ID maps to a name, and to an icon at `https://cdn.jsdelivr.net/gh/aryanranderiya/app-presence@main/icons/<bundle-id>.png`.
-- A single-slot scheduler sends `SET_ACTIVITY` over Discord's local IPC socket. Budget is 5 sends per 20 seconds. Inside the budget the update is immediate. Over it, only the newest app is kept and sent the instant a slot frees.
+- A single-slot scheduler sends `SET_ACTIVITY` the moment focus changes. A 250ms floor collapses a Cmd+Tab storm into the newest app. No token budget is needed: a burst of 9 updates in 2.5 seconds was accepted with no error.
+- If Discord starts after the app, or restarts, the socket reconnect resends the last app.
 - Password managers, Messages, Signal and WhatsApp are filtered out before anything is sent.
 
-Verified against a live client: Discord accepts external URLs for `large_image` and rewrites them to `mp:external/...`, so the 300-asset limit does not apply and nothing is uploaded by hand.
+Verified against a live client: Discord accepts external URLs for `large_image` and rewrites them to `mp:external/...`, so the 300-asset limit does not apply and nothing is uploaded by hand. All 267 exported icons return 200 from jsDelivr.
 
 ## Run
 
