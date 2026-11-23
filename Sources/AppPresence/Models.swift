@@ -1,5 +1,11 @@
 import Foundation
 
+enum AppPolicy: String {
+    case show
+    case off
+    case never
+}
+
 struct AppInfo: Equatable {
     let bundleID: String
     let name: String
@@ -23,31 +29,54 @@ struct AppInfo: Equatable {
     }
 
     var iconURL: String {
-        let base = "https://cdn.jsdelivr.net/gh/aryanranderiya/app-presence@main/icons/"
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-        let encoded = bundleID.addingPercentEncoding(withAllowedCharacters: allowed) ?? bundleID
-        return base + encoded + ".png"
+        "https://cdn.jsdelivr.net/gh/aryanranderiya/app-presence@main/icons/\(bundleID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? bundleID).png"
+    }
+}
+
+struct PresenceButton {
+    let label: String
+    let url: String
+}
+
+struct Presence {
+    let name: String
+    let details: String
+    var state: String? = nil
+    let iconURL: String
+    let iconText: String
+    var startedAt: Date? = nil
+    var buttons: [PresenceButton] = []
+
+    var signature: String {
+        let buttonKey = buttons.map { "\($0.label)|\($0.url)" }.joined(separator: ",")
+        return "\(name)|\(details)|\(state ?? "")|\(iconURL)|\(startedAt?.timeIntervalSince1970 ?? 0)|\(buttonKey)"
     }
 }
 
 final class AppRegistry {
     private let ownBundleID = Bundle.main.bundleIdentifier
+    private let store = Store.shared
     private let overrides = [
         "com.google.chrome": "Chrome", "com.apple.safari": "Safari", "com.microsoft.vscode": "VS Code",
         "com.apple.terminal": "Terminal", "com.mitchellh.ghostty": "Ghostty",
     ]
-    private let privateBundleIDs: Set<String> = [
-        "com.1password.1password", "com.agilebits.onepassword7", "com.bitwarden.desktop",
-        "com.apple.keychainaccess", "com.apple.mobilesms", "com.apple.ichat",
-        "org.whispersystems.signal-desktop", "net.whatsapp.whatsapp", "com.whatsapp.whatsapp",
-        "com.apple.passwords",
-    ]
 
     func resolve(_ app: AppInfo) -> AppInfo? {
         if app.bundleID == ownBundleID { return nil }
-        let key = app.bundleID.lowercased()
-        if privateBundleIDs.contains(key) || key.contains("bank") { return nil }
-        guard let name = overrides[key] else { return app }
+        guard store.policy(for: app.bundleID) == .show else { return nil }
+        guard let name = overrides[app.bundleID.lowercased()] else { return app }
         return AppInfo(bundleID: app.bundleID, name: name, pid: app.pid, launchedAt: app.launchedAt)
+    }
+
+    func presence(for app: AppInfo) -> Presence {
+        let phrase = store.phrase(for: app.bundleID)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Presence(
+            name: store.setting("card_name") ?? "Now Playing",
+            details: app.name,
+            state: (phrase?.isEmpty == false) ? phrase : nil,
+            iconURL: app.iconURL,
+            iconText: app.name,
+            startedAt: app.launchedAt
+        )
     }
 }

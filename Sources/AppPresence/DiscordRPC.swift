@@ -1,16 +1,20 @@
 import Foundation
 
 final class DiscordRPC {
-    private let clientID = "1574409162891460719"
+    private let clientID: String
     private let queue = DispatchQueue(label: "apppresence.rpc", qos: .utility)
     private var fd: Int32 = -1
     private var rxBuffer = Data()
     private var loggedReady = false
     private var retrying = false
-    private var lastActivity: AppInfo?
+    private var lastActivity: Presence?
+
+    init(clientID: String) {
+        self.clientID = clientID
+    }
 
     func connect() { queue.async { self.connectOnQueue() } }
-    func setActivity(_ app: AppInfo) { queue.async { self.sendActivity(app) } }
+    func setActivity(_ presence: Presence) { queue.async { self.sendActivity(presence) } }
     func clearActivity() { queue.async { self.sendActivity(nil) } }
 
     func shutdown(completion: (() -> Void)? = nil) {
@@ -47,18 +51,26 @@ final class DiscordRPC {
     private func retryLater() {
         queue.asyncAfter(deadline: .now() + 3) { [weak self] in self?.connectOnQueue() }
     }
-    private func sendActivity(_ app: AppInfo?) {
-        lastActivity = app
+    private func sendActivity(_ presence: Presence?) {
+        lastActivity = presence
         guard fd >= 0 else {
-            log("discord not connected, holding \(app?.name ?? "clear")")
+            log("discord not connected, holding \(presence?.details ?? "clear")")
             return
         }
         var activity: Any = NSNull()
-        if let app {
-            let assets: [String: Any] = ["large_image": app.iconURL, "large_text": app.name]
-            var fields: [String: Any] = ["details": app.name, "assets": assets, "instance": true]
-            if let launchedAt = app.launchedAt {
-                fields["timestamps"] = ["start": Int(launchedAt.timeIntervalSince1970 * 1000)]
+        if let presence {
+            var fields: [String: Any] = [
+                "name": presence.name,
+                "details": presence.details,
+                "assets": ["large_image": presence.iconURL, "large_text": presence.iconText],
+                "instance": true,
+            ]
+            if let state = presence.state { fields["state"] = state }
+            if let startedAt = presence.startedAt {
+                fields["timestamps"] = ["start": Int(startedAt.timeIntervalSince1970 * 1000)]
+            }
+            if !presence.buttons.isEmpty {
+                fields["buttons"] = presence.buttons.map { ["label": $0.label, "url": $0.url] }
             }
             activity = fields
         }
@@ -69,6 +81,7 @@ final class DiscordRPC {
             return
         }
         if !writeFrame(opcode: 1, body: body) { handleDisconnect(fd) }
+        log("presence \(presence?.name ?? "clear") / \(presence?.details ?? "") / \(presence?.state ?? "")")
     }
     private func readLoop(_ socketFD: Int32) {
         var buffer = [UInt8](repeating: 0, count: 4096)

@@ -2,11 +2,15 @@ import AppKit
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    private let store = Store.shared
     private let registry = AppRegistry()
     private let monitor = FocusMonitor()
     private let scheduler = PresenceScheduler()
-    private let rpc = DiscordRPC()
-    private let defaults = UserDefaults.standard
+    private let rpc = DiscordRPC(clientID: "1574409162891460719")
+    private let settingsWindow = SettingsWindowController()
+
+    private var waka: WakaTimeService?
+    private var wakaSignature = ""
     private var statusItem: NSStatusItem?
     private var currentItem: NSMenuItem?
     private var enabledItem: NSMenuItem?
@@ -15,49 +19,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var enabled = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        enabled = defaults.object(forKey: "enabled") as? Bool ?? true
+        enabled = store.setting("enabled") == "1"
         buildStatusItem()
-        scheduler.onSend = { [weak self] app in self?.rpc.setActivity(app) }
+        scheduler.onSend = { [weak self] presence in self?.rpc.setActivity(presence) }
         scheduler.onClear = { [weak self] in self?.rpc.clearActivity() }
         monitor.onAppChange = { [weak self] app in self?.route(app) }
-        observeSleep()
         rpc.connect()
         monitor.start()
+        syncWakaTime()
+
+        if CommandLine.arguments.contains("--settings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.openSettings()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         monitor.stop()
+        waka?.shutdown()
         rpc.shutdown()
     }
 
     private func buildStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let image = NSImage(systemSymbolName: "app.fill", accessibilityDescription: "AppPresence") {
-            image.isTemplate = true
-            item.button?.image = image
-        } else {
-            item.button?.title = "AppPresence"
-        }
+        let icon = MenuBarIcon.make()
+        item.button?.image = icon
+        item.button?.toolTip = "AppPresence"
 
         let menu = NSMenu()
         menu.delegate = self
+
         let current = menuItem("No app", nil)
         current.isEnabled = false
         currentItem = current
         menu.addItem(current)
         menu.addItem(.separator())
+
         let toggle = menuItem("Enabled", #selector(toggleEnabled))
         toggle.state = enabled ? .on : .off
         enabledItem = toggle
         menu.addItem(toggle)
+
         let launch = menuItem("Launch at Login", #selector(toggleLaunchAtLogin))
         launch.state = SMAppService.mainApp.status == .enabled ? .on : .off
         launchItem = launch
         menu.addItem(launch)
+
+        let settings = menuItem("Settings…", #selector(openSettings))
+        settings.keyEquivalent = ","
+        menu.addItem(settings)
+
         menu.addItem(.separator())
         let quitItem = menuItem("Quit", #selector(quit))
         quitItem.keyEquivalent = "q"
         menu.addItem(quitItem)
+
         item.menu = menu
         statusItem = item
     }
@@ -78,51 +95,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func route(_ app: AppInfo) {
-        if app.bundleID == Bundle.main.bundleIdentifier { return }
         guard let resolved = registry.resolve(app) else {
-            current = nil
-            currentItem?.title = "Hidden"
-            if enabled { scheduler.clear() }
+            if current == nil { currentItem?.title = "No app" }
             return
         }
         current = resolved
         currentItem?.title = label(for: resolved)
-        scheduler.submit(resolved)
+        scheduler.submit(registry.presence(for: resolved))
     }
 
-    private func resubmitCurrent() {
-        guard enabled, let app = monitor.current(), let resolved = registry.resolve(app) else { return }
-        current = resolved
-        currentItem?.title = label(for: resolved)
-        scheduler.submit(resolved)
+    private func syncWakaTime() {
+        let on = store.setting("wakatime_enabled") == "1"
+        let id = store.setting("wakatime_client_id") ?? ""
+        let signature = "\(on)#\(id)"
+        guard signature != wakaSignature else { return }
+        wakaSignature = signature
+        waka?.shutdown()
+        waka = nil
+        guard on, !id.isEmpty else { return }
+        let client = DiscordRPC(clientID: id)
+        client.connect()
+        let service = WakaTimeService(rpc: client, store: store)
+        service.start()
+        waka = service
     }
 
-    private func observeSleep() {
-        let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
-            center.addObserver(self, selector: #selector(wentAway), name: name, object: nil)
+    private func settingsChanged() {
+        enabled = store.setting("enabled") == "1"
+        enabledItem?.state = enabled ? .on : .off
+
+        if let shown = current, store.policy(for: shown.bundleID) != .show {
+            scheduler.clear()
+            current = nil
+            currentItem?.title = "No app"
         }
-        for name in [NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
-            center.addObserver(self, selector: #selector(cameBack), name: name, object: nil)
-        }
+        if enabled, let app = monitor.current() { route(app) }
+        syncWakaTime()
     }
 
-    @objc private func wentAway() {
-        log("screen away, clearing")
-        scheduler.clear()
-    }
-
-    @objc private func cameBack() {
-        log("screen back")
-        resubmitCurrent()
+    @objc private func openSettings() {
+        settingsWindow.show { [weak self] in self?.settingsChanged() }
     }
 
     @objc private func toggleEnabled() {
         enabled.toggle()
-        defaults.set(enabled, forKey: "enabled")
+        store.setSetting("enabled", enabled ? "1" : "0")
         enabledItem?.state = enabled ? .on : .off
         scheduler.setEnabled(enabled)
-        if enabled { resubmitCurrent() }
+        if enabled, let app = monitor.current() { route(app) }
     }
 
     @objc private func toggleLaunchAtLogin() {
@@ -141,11 +161,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func quit() {
+        waka?.shutdown()
         rpc.shutdown { NSApplication.shared.terminate(nil) }
     }
 }
 
 let application = NSApplication.shared
+
+if let index = CommandLine.arguments.firstIndex(of: "--dump-icon"), index + 1 < CommandLine.arguments.count {
+    let path = CommandLine.arguments[index + 1]
+    let icon = MenuBarIcon.make()
+    let canvas = NSImage(size: icon.size)
+    canvas.lockFocus()
+    NSColor.white.setFill()
+    NSRect(origin: .zero, size: icon.size).fill()
+    icon.draw(in: NSRect(origin: .zero, size: icon.size))
+    canvas.unlockFocus()
+    if let tiff = canvas.tiffRepresentation,
+       let rep = NSBitmapImageRep(data: tiff),
+       let png = rep.representation(using: .png, properties: [:]) {
+        try? png.write(to: URL(fileURLWithPath: path))
+    }
+    exit(0)
+}
+
 let delegate = AppDelegate()
 application.delegate = delegate
 application.setActivationPolicy(.accessory)

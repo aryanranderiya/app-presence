@@ -1,16 +1,16 @@
 import Foundation
 
 final class PresenceScheduler {
-    var onSend: ((AppInfo) -> Void)?
+    var onSend: ((Presence) -> Void)?
     var onClear: (() -> Void)?
 
     private let floor: TimeInterval = 0.25
     private let queue = DispatchQueue(label: "apppresence.scheduler", qos: .utility)
     private let timer: DispatchSourceTimer
-    private var pending: AppInfo?
+    private var pending: Presence?
     private var lastSentAt = Date.distantPast
     private var lastWasClear = true
-    private var lastKey: String?
+    private var lastSignature: String?
     private var enabled = true
 
     init() {
@@ -22,15 +22,15 @@ final class PresenceScheduler {
 
     deinit { timer.cancel() }
 
-    func submit(_ app: AppInfo) {
+    func submit(_ presence: Presence) {
         queue.async { [weak self] in
             guard let self, self.enabled else { return }
             let wait = self.floor - Date().timeIntervalSince(self.lastSentAt)
             if wait <= 0 {
                 self.pending = nil
-                self.transmit(app)
+                self.transmit(presence)
             } else {
-                self.pending = app
+                self.pending = presence
                 self.timer.schedule(deadline: .now() + wait)
             }
         }
@@ -55,24 +55,24 @@ final class PresenceScheduler {
     }
 
     private func flush() {
-        guard enabled, let app = pending else { return }
+        guard enabled, let presence = pending else { return }
         pending = nil
-        transmit(app)
+        transmit(presence)
     }
 
-    private func transmit(_ app: AppInfo) {
-        guard app.key != lastKey else { return }
-        lastKey = app.key
+    private func transmit(_ presence: Presence) {
+        guard presence.signature != lastSignature else { return }
+        lastSignature = presence.signature
         lastSentAt = Date()
         lastWasClear = false
-        log("send \(app.name)")
-        onSend?(app)
+        log("send \(presence.details)")
+        onSend?(presence)
     }
 
     private func clearIfNeeded() {
         guard !lastWasClear else { return }
         lastWasClear = true
-        lastKey = nil
+        lastSignature = nil
         lastSentAt = Date()
         log("clear")
         onClear?()

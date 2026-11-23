@@ -116,6 +116,7 @@ func activity(flat: Bool) -> [String: Any] {
     } else {
         fields = ["details": appName, "assets": ["large_image": imageURL, "large_text": appName], "instance": true]
     }
+    fields["name"] = "Now Playing"
     if let startAt {
         fields["timestamps"] = ["start": startAt]
     }
@@ -146,8 +147,9 @@ if !ok {
 }
 
 if ok {
-    print("VERDICT external image URL accepted. holding 60s so you can look at Discord.")
-    sleep(60)
+    print("VERDICT external image URL accepted. holding so you can look at Discord.")
+    let hold = Int(ProcessInfo.processInfo.environment["PROBE_HOLD"] ?? "") ?? 60
+    sleep(UInt32(max(hold, 1)))
 } else {
     print("VERDICT rejected. Fall back to uploaded Developer Portal assets.")
 }
