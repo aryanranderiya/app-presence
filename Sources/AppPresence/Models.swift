@@ -3,6 +3,24 @@ import Foundation
 struct AppInfo: Equatable {
     let bundleID: String
     let name: String
+    let pid: pid_t
+    let launchedAt: Date?
+
+    var key: String { "\(bundleID)#\(pid)" }
+
+    var elapsed: String {
+        guard let launchedAt else { return "" }
+        return Self.duration(Date().timeIntervalSince(launchedAt))
+    }
+
+    static func duration(_ seconds: TimeInterval) -> String {
+        let total = max(Int(seconds), 0)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        if hours > 0 { return "\(hours)h \(minutes)m" }
+        if minutes > 0 { return "\(minutes)m" }
+        return "\(total)s"
+    }
 
     var iconURL: String {
         let base = "https://cdn.jsdelivr.net/gh/aryanranderiya/app-presence@main/icons/"
@@ -30,6 +48,6 @@ final class AppRegistry {
         let key = app.bundleID.lowercased()
         if privateBundleIDs.contains(key) || key.contains("bank") { return nil }
         guard let name = overrides[key] else { return app }
-        return AppInfo(bundleID: app.bundleID, name: name)
+        return AppInfo(bundleID: app.bundleID, name: name, pid: app.pid, launchedAt: app.launchedAt)
     }
 }

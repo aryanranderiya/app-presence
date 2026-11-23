@@ -56,7 +56,11 @@ final class DiscordRPC {
         var activity: Any = NSNull()
         if let app {
             let assets: [String: Any] = ["large_image": app.iconURL, "large_text": app.name]
-            activity = ["details": app.name, "assets": assets, "instance": true] as [String: Any]
+            var fields: [String: Any] = ["details": app.name, "assets": assets, "instance": true]
+            if let launchedAt = app.launchedAt {
+                fields["timestamps"] = ["start": Int(launchedAt.timeIntervalSince1970 * 1000)]
+            }
+            activity = fields
         }
         let args: [String: Any] = ["pid": Int(ProcessInfo.processInfo.processIdentifier), "activity": activity]
         let payload: [String: Any] = ["cmd": "SET_ACTIVITY", "nonce": UUID().uuidString, "args": args]

@@ -8,6 +8,7 @@ guard args.count >= 3 else {
 let clientID = args[1]
 let imageURL = args[2]
 let appName = args.count > 3 ? args[3] : "Probe"
+let startAt = args.count > 4 ? Int(args[4]) : nil
 
 func candidateSockets() -> [String] {
     var out: [String] = []
@@ -109,10 +110,16 @@ let pid = Int(ProcessInfo.processInfo.processIdentifier)
 let nonce = UUID().uuidString
 
 func activity(flat: Bool) -> [String: Any] {
+    var fields: [String: Any]
     if flat {
-        return ["details": appName, "largeImageKey": imageURL, "largeImageText": appName, "instance": true]
+        fields = ["details": appName, "largeImageKey": imageURL, "largeImageText": appName, "instance": true]
+    } else {
+        fields = ["details": appName, "assets": ["large_image": imageURL, "large_text": appName], "instance": true]
     }
-    return ["details": appName, "assets": ["large_image": imageURL, "large_text": appName], "instance": true]
+    if let startAt {
+        fields["timestamps"] = ["start": startAt]
+    }
+    return fields
 }
 
 print("--- attempt: assets object ---")

@@ -4,7 +4,7 @@ final class FocusMonitor {
     var onAppChange: ((AppInfo) -> Void)?
 
     private var observer: NSObjectProtocol?
-    private var lastBundleID: String?
+    private var lastKey: String?
 
     func start() {
         observer = NSWorkspace.shared.notificationCenter.addObserver(
@@ -15,27 +15,36 @@ final class FocusMonitor {
         }
         if let app = NSWorkspace.shared.frontmostApplication { handle(app) }
     }
+
     func stop() {
         if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         observer = nil
     }
+
     func current() -> AppInfo? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
         return info(for: app)
     }
+
     private func handle(_ app: NSRunningApplication) {
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in self?.handle(app) }
             return
         }
-        guard let info = info(for: app), info.bundleID != lastBundleID else { return }
-        lastBundleID = info.bundleID
+        guard let info = info(for: app), info.key != lastKey else { return }
+        lastKey = info.key
         onAppChange?(info)
     }
+
     private func info(for app: NSRunningApplication) -> AppInfo? {
         guard app.activationPolicy == .regular else { return nil }
         guard let bundleID = app.bundleIdentifier, !bundleID.isEmpty else { return nil }
-        return AppInfo(bundleID: bundleID, name: Self.displayName(for: app))
+        return AppInfo(
+            bundleID: bundleID,
+            name: Self.displayName(for: app),
+            pid: app.processIdentifier,
+            launchedAt: app.launchDate
+        )
     }
 
     private static func displayName(for app: NSRunningApplication) -> String {

@@ -10,6 +10,7 @@ final class PresenceScheduler {
     private var pending: AppInfo?
     private var lastSentAt = Date.distantPast
     private var lastWasClear = true
+    private var lastKey: String?
     private var enabled = true
 
     init() {
@@ -60,6 +61,8 @@ final class PresenceScheduler {
     }
 
     private func transmit(_ app: AppInfo) {
+        guard app.key != lastKey else { return }
+        lastKey = app.key
         lastSentAt = Date()
         lastWasClear = false
         log("send \(app.name)")
@@ -69,6 +72,7 @@ final class PresenceScheduler {
     private func clearIfNeeded() {
         guard !lastWasClear else { return }
         lastWasClear = true
+        lastKey = nil
         lastSentAt = Date()
         log("clear")
         onClear?()
