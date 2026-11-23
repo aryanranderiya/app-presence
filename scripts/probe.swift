@@ -9,6 +9,8 @@ let clientID = args[1]
 let imageURL = args[2]
 let appName = args.count > 3 ? args[3] : "Probe"
 let startAt = args.count > 4 ? Int(args[4]) : nil
+let displayName = ProcessInfo.processInfo.environment["PROBE_NAME"] ?? "Now Playing"
+let activityType = Int(ProcessInfo.processInfo.environment["PROBE_TYPE"] ?? "") ?? 0
 
 func candidateSockets() -> [String] {
     var out: [String] = []
@@ -116,7 +118,8 @@ func activity(flat: Bool) -> [String: Any] {
     } else {
         fields = ["details": appName, "assets": ["large_image": imageURL, "large_text": appName], "instance": true]
     }
-    fields["name"] = "Now Playing"
+    fields["name"] = displayName
+    fields["type"] = activityType
     if let startAt {
         fields["timestamps"] = ["start": startAt]
     }

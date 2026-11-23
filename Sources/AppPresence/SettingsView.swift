@@ -83,7 +83,7 @@ final class SettingsModel: ObservableObject {
                 self.wakaStatus = "Could not reach WakaTime"
                 return
             }
-            let extra = snapshot.facts.first ?? snapshot.hover
+            let extra = snapshot.summary
             self.wakaStatus = extra.isEmpty ? snapshot.total : "\(snapshot.total) · \(extra)"
         }
     }

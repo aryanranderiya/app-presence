@@ -2,7 +2,7 @@ import Foundation
 
 struct WakaTimeSnapshot {
     let total: String
-    let facts: [String]
+    let summary: String
     let hover: String
 }
 
@@ -12,9 +12,7 @@ final class WakaTimeService {
     private let rpc: DiscordRPC
     private let store: Store
     private var refreshTimer: Timer?
-    private var rotateTimer: Timer?
     private var snapshot: WakaTimeSnapshot?
-    private var rotation = 0
 
     init(rpc: DiscordRPC, store: Store) {
         self.rpc = rpc
@@ -34,26 +32,17 @@ final class WakaTimeService {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             self?.refresh()
         }
-
-        rotateTimer?.invalidate()
-        rotateTimer = Timer.scheduledTimer(withTimeInterval: 45, repeats: true) { [weak self] _ in
-            self?.rotate()
-        }
     }
 
     func stop() {
         refreshTimer?.invalidate()
         refreshTimer = nil
-        rotateTimer?.invalidate()
-        rotateTimer = nil
         rpc.clearActivity()
     }
 
     func shutdown() {
         refreshTimer?.invalidate()
         refreshTimer = nil
-        rotateTimer?.invalidate()
-        rotateTimer = nil
         rpc.shutdown()
     }
 
@@ -65,25 +54,19 @@ final class WakaTimeService {
         }
     }
 
-    private func rotate() {
-        guard snapshot != nil else { return }
-        rotation += 1
-        push()
-    }
-
     private func push() {
         guard let snapshot else { return }
-        let fact = snapshot.facts.isEmpty ? nil : snapshot.facts[rotation % snapshot.facts.count]
         rpc.setActivity(Presence(
             name: "WakaTime",
             details: snapshot.total,
-            state: fact,
+            state: snapshot.summary.isEmpty ? nil : snapshot.summary,
             iconURL: Self.iconURL,
             iconText: snapshot.hover,
             buttons: [
                 PresenceButton(label: "Dashboard", url: "https://wakatime.com/dashboard"),
                 PresenceButton(label: "Leaderboard", url: "https://wakatime.com/leaders"),
-            ]
+            ],
+            type: 3
         ))
     }
 
@@ -122,41 +105,25 @@ final class WakaTimeService {
             let editors = payload["editors"] as? [[String: Any]] ?? []
             let systems = payload["operating_systems"] as? [[String: Any]] ?? []
 
-            var facts: [String] = []
-            if let first = projects.first, let name = first["name"] as? String {
-                facts.append(join(name, first["text"] as? String))
-            }
-            if let language = languages.first(where: { ($0["name"] as? String)?.lowercased() != "other" }),
-               let name = language["name"] as? String {
-                facts.append(join(name, language["text"] as? String))
-            }
-            if let first = editors.first, let name = first["name"] as? String {
-                facts.append(join(name, first["text"] as? String))
-            }
-            if projects.count > 1 {
-                facts.append("\(projects.count) projects today")
-            }
-            if aiLines > 0 {
-                facts.append("\(aiLines) AI lines")
-            }
+            let project = projects.first?["name"] as? String
+            let language = languages
+                .first { ($0["name"] as? String)?.lowercased() != "other" }?["name"] as? String
+            let editor = editors.first?["name"] as? String
+            let system = systems.first?["name"] as? String
 
-            let hover = ["WakaTime", editors.first?["name"] as? String, systems.first?["name"] as? String]
-                .compactMap { $0 }
-                .joined(separator: " · ")
+            let summary = [project, language, editor].compactMap { $0 }.joined(separator: " · ")
+            var hoverParts = ["\(projects.count) projects"]
+            if let system { hoverParts.append(system) }
+            if aiLines > 0 { hoverParts.append("\(aiLines) AI lines") }
 
             let snapshot = WakaTimeSnapshot(
                 total: "\(hours)h \(minutes)m today",
-                facts: facts,
-                hover: hover
+                summary: summary,
+                hover: hoverParts.joined(separator: " · ")
             )
-            log("wakatime \(snapshot.total) \(facts.first ?? "")")
+            log("wakatime \(snapshot.total) \(summary)")
             DispatchQueue.main.async { completion(snapshot) }
         }.resume()
-    }
-
-    private static func join(_ name: String, _ text: String?) -> String {
-        guard let text, !text.isEmpty else { return name }
-        return "\(name) · \(text)"
     }
 
     private static func apiKey() -> String? {

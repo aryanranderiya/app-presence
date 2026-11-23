@@ -242,7 +242,7 @@ final class Store {
     }
 
     private static let defaultPhrases: [String: String] = [
-        "com.superlogical.rex": "shipping with rex",
+        "com.superlogical.rex": "shipping with",
         "com.conductor.app": "conducting agents",
         "company.thebrowser.Browser": "browsing",
         "company.thebrowser.dia": "browsing",
@@ -256,10 +256,10 @@ final class Store {
         "com.google.Chrome": "browsing",
         "com.apple.Safari": "browsing",
         "com.microsoft.VSCode": "writing code",
-        "com.openai.codex": "in codex",
+        "com.openai.codex": "pairing on",
         "com.electron.ollama": "running local models",
         "com.raycast.macos": "launching things",
-        "com.hnc.Discord": "on discord",
+        "com.hnc.Discord": "chatting on",
         "com.apple.finder": "looking for files",
         "com.apple.mail": "reading email",
         "com.apple.iCal": "checking the calendar",
@@ -288,16 +288,16 @@ final class Store {
         "com.knollsoft.Rectangle": "snapping windows",
         "com.lowtechguys.Clop": "compressing",
         "me.damir.dropover-mac": "moving files",
-        "net.whatsapp.WhatsApp": "on whatsapp",
-        "ru.keepcoder.Telegram": "on telegram",
+        "net.whatsapp.WhatsApp": "messaging on",
+        "ru.keepcoder.Telegram": "messaging on",
         "org.videolan.vlc": "watching something",
         "org.m0k.transmission": "downloading",
         "com.utmapp.UTM": "in a vm",
         "macos-wakatime.WakaTime": "checking stats",
-        "app.swiftcord": "on swiftcord",
+        "app.swiftcord": "chatting on",
         "com.setapp.DesktopClient": "browsing setapp",
         "com.pilotmoon.scroll-reverser": "flipping scroll",
         "io.tailscale.ipn.macsys": "on the tailnet",
-        "com.anthropic.claude-code-url-handler": "in claude code",
+        "com.anthropic.claude-code-url-handler": "pairing on",
     ]
 }

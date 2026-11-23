@@ -46,10 +46,11 @@ struct Presence {
     let iconText: String
     var startedAt: Date? = nil
     var buttons: [PresenceButton] = []
+    var type: Int = 0
 
     var signature: String {
         let buttonKey = buttons.map { "\($0.label)|\($0.url)" }.joined(separator: ",")
-        return "\(name)|\(details)|\(state ?? "")|\(iconURL)|\(startedAt?.timeIntervalSince1970 ?? 0)|\(buttonKey)"
+        return "\(name)|\(details)|\(state ?? "")|\(iconURL)|\(startedAt?.timeIntervalSince1970 ?? 0)|\(buttonKey)|\(type)"
     }
 }
 
@@ -70,10 +71,10 @@ final class AppRegistry {
 
     func presence(for app: AppInfo) -> Presence {
         let phrase = store.phrase(for: app.bundleID)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = (phrase?.isEmpty == false ? phrase : nil) ?? store.setting("card_name") ?? "Now Playing"
         return Presence(
-            name: store.setting("card_name") ?? "Now Playing",
+            name: title,
             details: app.name,
-            state: (phrase?.isEmpty == false) ? phrase : nil,
             iconURL: app.iconURL,
             iconText: app.name,
             startedAt: app.launchedAt

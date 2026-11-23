@@ -64,6 +64,7 @@ final class DiscordRPC {
                 "details": presence.details,
                 "assets": ["large_image": presence.iconURL, "large_text": presence.iconText],
                 "instance": true,
+                "type": presence.type,
             ]
             if let state = presence.state { fields["state"] = state }
             if let startedAt = presence.startedAt {

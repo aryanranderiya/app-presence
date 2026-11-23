@@ -11,10 +11,10 @@ A tiny macOS menu bar app. No bot, no token, no login, and nothing uploaded to t
 ## Features
 
 - **Only what you choose.** Nothing appears by default. Turn on an app and it shows. Everything else stays private, which matters when the app in front is not something you want on your profile.
-- **Custom status lines.** Each app gets its own line, like `shipping with rex` for Rex or `conducting agents` for Conductor. Seeded for 50+ apps, editable per app, with a plain app-name fallback.
+- **Custom status lines.** Each app gets its own line, like `shipping with` for Rex or `conducting agents` for Conductor. The app name sits underneath, so there is no duplication. Seeded for 50+ apps, editable per app.
 - **Real logos, not placeholders.** Every app in `/Applications` is exported at 512px and served from this repo. Rex, Conductor, Arc, Ghostty and 263 others each show their actual icon.
 - **Elapsed time from launch.** Discord's timer counts from when the app actually opened, not from when you last focused it.
-- **A second card for WakaTime.** Today's coding total, top project, top language, editor, and two buttons for your Dashboard and the Leaderboard. It rotates the detail line so the card stays informative.
+- **A second card for WakaTime.** Today's coding total, then top project, top language and editor in one line, with Dashboard and Leaderboard buttons. It uses the Watching activity type, which is how it coexists with the Playing card.
 - **Hard blocks.** Mark an app as never, like Discord or 1Password, and it can never appear even if you enable everything else.
 - **Stays put.** Switching to a hidden app does not wipe your status. The last allowed card stays until another allowed app takes over.
 - **Menu bar only.** No dock icon, no window, no polling loop.
@@ -51,7 +51,7 @@ Discord shows one card per application, which is why the stats card needs its ow
 - The bundle ID is looked up in SQLite. Only a `show` policy produces a presence, so the allowlist is the default and a hidden app never reaches Discord.
 - The presence carries a custom header, the app name, the phrase, the icon URL, a launch timestamp, and up to two buttons.
 - A single-slot scheduler sends `SET_ACTIVITY` over Discord's local IPC socket. A 250ms floor collapses a Cmd+Tab storm, and an identical payload is never sent twice.
-- The WakaTime card uses a second connection with its own application ID, refreshes every 5 minutes, and rotates its detail line every 45 seconds.
+- The WakaTime card uses a second connection with its own application ID and the Watching type. Discord shows one activity per category, so Playing and Watching can both render. It refreshes every 5 minutes.
 
 ## Adding an app
 
