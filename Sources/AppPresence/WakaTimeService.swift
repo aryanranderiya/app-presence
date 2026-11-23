@@ -117,8 +117,8 @@ final class WakaTimeService {
             fetchLeaderboard(key: key) { board in
                 var summaryParts: [String] = []
                 if let board {
-                    if board.dailySeconds > 0 { summaryParts.append("\(hoursOnly(board.dailySeconds))/day") }
-                    if board.weekSeconds > 0 { summaryParts.append("\(hoursOnly(board.weekSeconds))/week") }
+                    if board.dailySeconds > 0 { summaryParts.append("\(hoursDecimal(board.dailySeconds))/day") }
+                    if board.weekSeconds > 0 { summaryParts.append("\(hoursDecimal(board.weekSeconds))/week") }
                 }
 
                 let snapshot = WakaTimeSnapshot(
@@ -185,9 +185,9 @@ final class WakaTimeService {
         }.resume()
     }
 
-    private static func hoursOnly(_ seconds: Double) -> String {
-        let hours = Int((max(seconds, 0) / 3600).rounded())
-        return "\(hours)h"
+    private static func hoursDecimal(_ seconds: Double) -> String {
+        let hours = max(seconds, 0) / 3600
+        return String(format: "%.1fh", hours)
     }
 
     private static func compact(_ seconds: Double) -> String {

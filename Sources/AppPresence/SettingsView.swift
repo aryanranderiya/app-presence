@@ -10,6 +10,7 @@ final class SettingsModel: ObservableObject {
     @Published var query = ""
     @Published var policies: [String: AppPolicy] = [:]
     @Published var phrases: [String: String] = [:]
+    @Published var details: [String: String] = [:]
     @Published var blocked: [BlockedApp] = []
     @Published var tab = 0
     @Published var cardName = "Now Playing"
@@ -33,6 +34,7 @@ final class SettingsModel: ObservableObject {
         for app in apps { map[app.id] = store.policy(for: app.id) }
         policies = map
         phrases = store.allPhrases()
+        details = store.allDetails()
         blocked = store.blockedApps()
         cardName = store.setting("card_name") ?? "Now Playing"
         wakaEnabled = store.setting("wakatime_enabled") == "1"
@@ -57,6 +59,12 @@ final class SettingsModel: ObservableObject {
     func setPhrase(_ app: InstalledApp, _ text: String) {
         phrases[app.id] = text
         store.setPhrase(text, for: app.id)
+        onChange()
+    }
+
+    func setDetail(_ app: InstalledApp, _ text: String) {
+        details[app.id] = text
+        store.setDetail(text, for: app.id)
         onChange()
     }
 
@@ -193,6 +201,14 @@ struct SettingsView: View {
                 TextField("Add a status line", text: Binding(
                     get: { model.phrases[app.id] ?? "" },
                     set: { value in model.setPhrase(app, value) }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 11))
+                .padding(.leading, 32)
+
+                TextField("Add a detail line", text: Binding(
+                    get: { model.details[app.id] ?? "" },
+                    set: { value in model.setDetail(app, value) }
                 ))
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 11))

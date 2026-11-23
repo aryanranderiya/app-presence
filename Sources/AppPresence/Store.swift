@@ -42,6 +42,10 @@ final class Store {
             bundle_id TEXT PRIMARY KEY,
             text TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS details (
+            bundle_id TEXT PRIMARY KEY,
+            text TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -85,6 +89,11 @@ final class Store {
                 setPhraseLocked(text, bundleID: id)
             }
             setSettingLocked("phrases_seeded", "1")
+        }
+
+        if settingLocked("details_seeded") != "1" {
+            setDetailLocked("building agents", bundleID: "com.superlogical.rex")
+            setSettingLocked("details_seeded", "1")
         }
     }
 
@@ -159,6 +168,32 @@ final class Store {
         return out
     }
 
+    func detail(for bundleID: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return detailLocked(bundleID)
+    }
+
+    func setDetail(_ text: String, for bundleID: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        setDetailLocked(text, bundleID: bundleID)
+    }
+
+    func allDetails() -> [String: String] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [:] }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT bundle_id, text FROM details", -1, &statement, nil) == SQLITE_OK else { return [:] }
+        defer { sqlite3_finalize(statement) }
+        var out: [String: String] = [:]
+        while sqlite3_step(statement) == SQLITE_ROW {
+            out[String(cString: sqlite3_column_text(statement, 0))] = String(cString: sqlite3_column_text(statement, 1))
+        }
+        return out
+    }
+
     func setting(_ key: String) -> String? {
         lock.lock()
         defer { lock.unlock() }
@@ -210,6 +245,35 @@ final class Store {
         }
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, "INSERT INTO phrases (bundle_id, text) VALUES (?, ?) ON CONFLICT(bundle_id) DO UPDATE SET text = excluded.text", -1, &statement, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, bundleID, -1, transient)
+        sqlite3_bind_text(statement, 2, trimmed, -1, transient)
+        sqlite3_step(statement)
+    }
+
+    private func detailLocked(_ bundleID: String) -> String? {
+        guard let db else { return nil }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT text FROM details WHERE bundle_id = ?", -1, &statement, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, bundleID, -1, transient)
+        guard sqlite3_step(statement) == SQLITE_ROW, let raw = sqlite3_column_text(statement, 0) else { return nil }
+        return String(cString: raw)
+    }
+
+    private func setDetailLocked(_ text: String, bundleID: String) {
+        guard let db else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, "DELETE FROM details WHERE bundle_id = ?", -1, &statement, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(statement) }
+            sqlite3_bind_text(statement, 1, bundleID, -1, transient)
+            sqlite3_step(statement)
+            return
+        }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "INSERT INTO details (bundle_id, text) VALUES (?, ?) ON CONFLICT(bundle_id) DO UPDATE SET text = excluded.text", -1, &statement, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_text(statement, 1, bundleID, -1, transient)
         sqlite3_bind_text(statement, 2, trimmed, -1, transient)

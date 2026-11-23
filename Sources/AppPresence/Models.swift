@@ -72,9 +72,11 @@ final class AppRegistry {
     func presence(for app: AppInfo) -> Presence {
         let phrase = store.phrase(for: app.bundleID)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = (phrase?.isEmpty == false ? phrase : nil) ?? store.setting("card_name") ?? "Now Playing"
+        let detail = AppContext.detail(for: app.bundleID) ?? store.detail(for: app.bundleID)
         return Presence(
             name: title,
             details: app.name,
+            state: (detail?.isEmpty == false ? detail : nil),
             iconURL: app.iconURL,
             iconText: app.name,
             startedAt: app.launchedAt
