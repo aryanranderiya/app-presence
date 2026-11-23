@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/screenshot.png" width="272" alt="Discord profile card showing Live App Status with the Rex logo">
+  <img src="docs/screenshot.png" width="620" alt="Discord profile showing a Playing card for Rex and a Watching WakaTime card with rank and daily average">
 </p>
 
 <h1 align="center">AppPresence</h1>
