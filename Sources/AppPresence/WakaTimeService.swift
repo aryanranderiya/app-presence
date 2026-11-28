@@ -100,7 +100,26 @@ final class WakaTimeService {
             let total = payload["grand_total"] as? [String: Any] ?? [:]
             let hours = total["hours"] as? Int ?? 0
             let minutes = total["minutes"] as? Int ?? 0
+            let seconds = total["total_seconds"] as? Double ?? 0
             let aiLines = total["ai_additions"] as? Int ?? 0
+
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "yyyy-MM-dd"
+            let today = dayFormatter.string(from: Date())
+            let yesterday = dayFormatter.string(from: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date())
+            let cachedTotal = Store.shared.setting("waka_last_total")
+            let cachedDate = Store.shared.setting("waka_last_date")
+
+            let totalLabel: String
+            if seconds > 0 {
+                totalLabel = "\(hours)h \(minutes)m today"
+                Store.shared.setSetting("waka_last_total", "\(hours)h \(minutes)m")
+                Store.shared.setSetting("waka_last_date", today)
+            } else if let cachedTotal, !cachedTotal.isEmpty, cachedDate == yesterday {
+                totalLabel = "\(cachedTotal) yesterday"
+            } else {
+                totalLabel = "0h 0m today"
+            }
 
             let projects = payload["projects"] as? [[String: Any]] ?? []
             let editors = payload["editors"] as? [[String: Any]] ?? []
@@ -122,7 +141,7 @@ final class WakaTimeService {
                 }
 
                 let snapshot = WakaTimeSnapshot(
-                    total: "\(hours)h \(minutes)m today",
+                    total: totalLabel,
                     summary: summaryParts.joined(separator: " • "),
                     hover: hoverParts.joined(separator: " · "),
                     rank: board?.rank

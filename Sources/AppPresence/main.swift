@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var waka: WakaTimeService?
     private var wakaSignature = ""
+    private var contextTimer: Timer?
     private var statusItem: NSStatusItem?
     private var currentItem: NSMenuItem?
     private var enabledItem: NSMenuItem?
@@ -24,9 +25,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         scheduler.onSend = { [weak self] presence in self?.rpc.setActivity(presence) }
         scheduler.onClear = { [weak self] in self?.rpc.clearActivity() }
         monitor.onAppChange = { [weak self] app in self?.route(app) }
+        AppContext.onChange = { [weak self] bundleID in
+            guard let self, self.enabled,
+                  let app = self.monitor.current(), app.bundleID == bundleID
+            else { return }
+            self.refreshContext()
+        }
         rpc.connect()
         monitor.start()
         syncWakaTime()
+
+        contextTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            self?.refreshContext()
+        }
 
         if CommandLine.arguments.contains("--settings") || store.allowedCount() == 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
@@ -36,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        contextTimer?.invalidate()
         monitor.stop()
         waka?.shutdown()
         rpc.shutdown()
@@ -102,6 +114,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         current = resolved
         currentItem?.title = label(for: resolved)
+        scheduler.submit(registry.presence(for: resolved))
+    }
+
+    private func refreshContext() {
+        guard enabled, let app = monitor.current(), let resolved = registry.resolve(app) else { return }
         scheduler.submit(registry.presence(for: resolved))
     }
 
